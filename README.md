@@ -157,7 +157,7 @@ oc set image deployment/devspaces-multicluster-redirector \
 
    > **IMPORTANT**: The Service Account **must** be configured with the `serviceaccounts.openshift.io/oauth-redirecturi.primary` annotation. This annotation specifies the OAuth callback URL that the OAuth Proxy will use for authentication. Without this annotation, the OAuth authentication flow will fail.
    >
-   > Example (see [`openshift/serviceaccount.yaml`](openshift/serviceaccount.yaml)):
+   > Example (see [`openshift/aro1/serviceaccount-patch.yaml`](openshift/aro1/serviceaccount-patch.yaml)):
    > ```yaml
    > apiVersion: v1
    > kind: ServiceAccount
@@ -174,47 +174,50 @@ oc set image deployment/devspaces-multicluster-redirector \
 
 ### Deployment Steps
 
-The `openshift/` directory contains Kustomize configuration files:
+The `openshift/` directory contains a Kustomize base and one overlay per cluster:
+
+```
+openshift/
+  base/   # namespace, ServiceAccount, RBAC, ConfigMap, Deployment, Service, Route
+  aro1/   # OAuth redirect URI annotation and Route host of cluster aro1
+  aro2/   # idem for cluster aro2
+```
+
+Create the OAuth proxy session secret (kept out of Git) and apply the overlay of the target cluster:
 
 ```bash
-oc new-project redirector
-kubectl apply -k openshift -n redirector
+oc apply -f openshift/base/namespace.yaml
+oc create secret generic devspaces-multicluster-redirector-session-secret \
+  -n devspaces-redirector --from-literal=session_secret=$(openssl rand -base64 32)
+oc apply -k openshift/aro1
 ```
 
 This creates:
-- **ServiceAccount**: `devspaces-multicluster-redirector`
+- **Namespace**: `devspaces-redirector`
+- **ServiceAccount**: `devspaces-multicluster-redirector` (with the `oauth-redirecturi.primary` annotation from the overlay)
 - **ClusterRole**: Permissions to list and get groups
 - **ClusterRoleBinding**: Binds the role to the service account
 - **ConfigMap**: Group mapping configuration
-- **Secret**: OAuth proxy session secret
-- **Deployment**: Application with OAuth proxy sidecar
+- **Deployment**: Application with OAuth proxy sidecar, using the Red Hat certified image
 - **Service**: Internal service on port 8443
-- **Route**: External HTTPS access
+- **Route**: External HTTPS access with the host set in the overlay
 
-#### Using Production Image
+With OpenShift GitOps, point an `Application` to `openshift/<cluster>` of this repository.
 
-For production deployments, modify `openshift/deployment.yaml` to use the Red Hat certified image before applying:
+#### Container image
 
-```yaml
-containers:
-  - name: devspaces-multicluster-redirector
-    image: registry.redhat.io/devspaces/multicluster-redirector-rhel9:latest  # Use specific version tag in production
-    ports:
-      - containerPort: 8080
-```
-
-Or patch an existing deployment:
+`openshift/base/deployment.yaml` uses `registry.redhat.io/devspaces/multicluster-redirector-rhel9:3.30.2`. Keep the tag equal to the Dev Spaces version installed in the cluster. To use the upstream image instead:
 
 ```bash
-oc patch deployment devspaces-multicluster-redirector \
-  -p '{"spec":{"template":{"spec":{"containers":[{"name":"devspaces-multicluster-redirector","image":"registry.redhat.io/devspaces/multicluster-redirector-rhel9:latest"}]}}}}'
+oc set image deployment/devspaces-multicluster-redirector -n devspaces-redirector \
+  devspaces-multicluster-redirector=quay.io/redhat-developer/devspaces-multicluster-redirector:latest
 ```
 
 ### Configuration
 
 #### Group Mapping ConfigMap
 
-Edit `openshift/configmap.yaml` to configure your group mappings:
+Edit `openshift/base/configmap.yaml` to configure your group mappings:
 
 ```yaml
 apiVersion: v1
@@ -243,7 +246,7 @@ Keys are matched using **AND logic**: a comma-separated key like `"team-alpha, t
 
 #### RBAC Permissions
 
-The service account needs these permissions (defined in `openshift/clusterrole.yaml`):
+The service account needs these permissions (defined in `openshift/base/clusterrole.yaml`):
 
 ```yaml
 rules:

@@ -9,4 +9,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: devspaces-multicluster-redirector
-  namespace: redirector
+  namespace: devspaces-redirector
