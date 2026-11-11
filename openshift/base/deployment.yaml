@@ -15,7 +15,7 @@ spec:
       serviceAccountName: devspaces-multicluster-redirector
       containers:
         - name: devspaces-multicluster-redirector
-          image: registry.redhat.io/devspaces/multicluster-redirector-rhel9:3.30.2
+          image: quay.io/marolive/devspaces-multicluster-redirector:1.0.1
           ports:
             - containerPort: 8080
           volumeMounts:

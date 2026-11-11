@@ -26,10 +26,42 @@ public class UserInfoResource {
     @Inject
     OpenShiftGroupService openShiftGroupService;
 
+    /**
+     * Suffix appended by the OpenShift OAuth Proxy to X-Forwarded-Email when the
+     * OpenShift user name does not contain an "@".
+     */
+    static final String CLUSTER_LOCAL_SUFFIX = "@cluster.local";
+
+    /**
+     * Resolve the OpenShift user name from the OAuth Proxy headers.
+     * <p>
+     * The OAuth Proxy sets X-Forwarded-Email to the OpenShift user name (plus
+     * "@cluster.local" when the name has no "@") and X-Forwarded-User to the part
+     * before the "@". For user names that contain an "@" (for example when the
+     * identity provider maps the user name to an e-mail address) X-Forwarded-User
+     * is truncated and no longer matches the OpenShift group membership, so the
+     * e-mail header is preferred.
+     *
+     * @param userHeader  value of X-Forwarded-User, may be null
+     * @param emailHeader value of X-Forwarded-Email, may be null
+     * @return the OpenShift user name, or null when both headers are absent
+     */
+    static String resolveUserName(String userHeader, String emailHeader) {
+        if (emailHeader != null && !emailHeader.isEmpty()) {
+            if (emailHeader.endsWith(CLUSTER_LOCAL_SUFFIX)) {
+                return emailHeader.substring(0, emailHeader.length() - CLUSTER_LOCAL_SUFFIX.length());
+            }
+            return emailHeader;
+        }
+        return userHeader;
+    }
+
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Response getUserInfo(@Context HttpHeaders headers) {
-        String userHeader = headers.getHeaderString("X-Forwarded-User");
+        String userHeader = resolveUserName(
+                headers.getHeaderString("X-Forwarded-User"),
+                headers.getHeaderString("X-Forwarded-Email"));
         String groupsHeader = headers.getHeaderString("X-Forwarded-Groups");
 
         ObjectMapper mapper = new ObjectMapper();

@@ -206,12 +206,19 @@ With OpenShift GitOps, point an `Application` to `openshift/<cluster>` of this r
 
 #### Container image
 
-`openshift/base/deployment.yaml` uses `registry.redhat.io/devspaces/multicluster-redirector-rhel9:3.30.2`. Keep the tag equal to the Dev Spaces version installed in the cluster. To use the upstream image instead:
+`openshift/base/deployment.yaml` uses `quay.io/marolive/devspaces-multicluster-redirector:1.0.1`, built from this fork. It differs from the upstream image in one point: the user name is taken from the `X-Forwarded-Email` header (the full OpenShift user name) instead of `X-Forwarded-User`, which the OAuth Proxy truncates at the `@` when the identity provider maps user names to e-mail addresses (see `UserInfoResource.resolveUserName`). Without this change users whose name contains an `@` never match their OpenShift groups.
+
+To build and push a new version:
 
 ```bash
-oc set image deployment/devspaces-multicluster-redirector -n devspaces-redirector \
-  devspaces-multicluster-redirector=quay.io/redhat-developer/devspaces-multicluster-redirector:latest
+mvn package -DskipTests \
+  -Dquarkus.container-image.build=true -Dquarkus.container-image.push=true \
+  -Dquarkus.container-image.registry=quay.io -Dquarkus.container-image.group=<org> \
+  -Dquarkus.container-image.name=devspaces-multicluster-redirector -Dquarkus.container-image.tag=<tag> \
+  -Dquarkus.jib.platforms=linux/amd64
 ```
+
+The Red Hat certified image `registry.redhat.io/devspaces/multicluster-redirector-rhel9:<devspaces-version>` can be used instead once the fix is available upstream.
 
 ### Configuration
 
