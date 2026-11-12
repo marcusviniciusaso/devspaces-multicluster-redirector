@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: devspaces-redirector-appgw
+  namespace: devspaces-redirector
+spec:
+  host: devspaces-appgw-19505.eastus.cloudapp.azure.com
+  to:
+    kind: Service
+    name: devspaces-multicluster-redirector
+    weight: 100
+  port:
+    targetPort: https
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
