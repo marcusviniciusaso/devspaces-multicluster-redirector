@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devspaces-openshift-group-mapping
+  namespace: devspaces-redirector
+data:
+  # Grupos locais (HTPasswd) -> URL da instância do Dev Spaces
+  group-mapping.json: |
+    {
+      "team-a": "https://devspaces.apps.jhygu4bs.eastus.aroapp.io",
+      "team-b": "https://devspaces.apps.kmw9dlzrxf7af3b80c.eastus.aroapp.io"
+    }
