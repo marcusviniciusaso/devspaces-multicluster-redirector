@@ -1,0 +1,28 @@
+# Build (a partir da raiz do repositório):
+#   podman build --platform linux/amd64 -f docker/Containerfile -t quay.io/<org>/devspaces-multicluster-redirector:<tag> .
+
+# ---- build ----
+FROM registry.access.redhat.com/ubi9/openjdk-17:1.24 AS build
+
+WORKDIR /home/default/app
+
+COPY --chown=185:0 pom.xml .
+RUN mvn -B -q dependency:go-offline
+
+COPY --chown=185:0 src ./src
+RUN mvn -B -q package -DskipTests -Dquarkus.container-image.build=false
+
+# ---- runtime ----
+FROM registry.access.redhat.com/ubi9/openjdk-17-runtime:1.24
+
+ENV LANGUAGE='en_US:en'
+
+COPY --from=build --chown=185:0 /home/default/app/target/devspaces-multicluster-redirector-*.jar /deployments/app.jar
+
+EXPOSE 8080
+USER 185
+
+ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+ENV JAVA_APP_JAR="/deployments/app.jar"
+
+ENTRYPOINT [ "/opt/jboss/container/java/run/run-java.sh" ]
